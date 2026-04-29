@@ -90,7 +90,11 @@ export interface ConfigWritePreview {
 }
 
 export function getPiGlobalConfigPath(overridePath?: string): string {
-  return overridePath ? resolve(overridePath) : PI_GLOBAL_CONFIG_PATH;
+  if (overridePath) return resolve(overridePath);
+  if (process.env.PI_CODING_AGENT_DIR) {
+    return resolve(process.env.PI_CODING_AGENT_DIR, "mcp.json");
+  }
+  return PI_GLOBAL_CONFIG_PATH;
 }
 
 export function getGenericGlobalConfigPath(): string {

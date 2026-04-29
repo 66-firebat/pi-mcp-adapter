@@ -1,7 +1,7 @@
 // metadata-cache.ts - Persistent MCP metadata cache
 import { existsSync, readFileSync, writeFileSync, renameSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { getToolUiResourceUri } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { McpTool, McpResource, ServerEntry, ToolMetadata } from "./types.js";
@@ -40,13 +40,17 @@ export interface MetadataCache {
 }
 
 export function getMetadataCachePath(): string {
-  return CACHE_PATH;
+ if (process.env.PI_CODING_AGENT_DIR) {
+   return resolve(process.env.PI_CODING_AGENT_DIR, "mcp-cache.json");
+ }
+ return CACHE_PATH;
 }
 
 export function loadMetadataCache(): MetadataCache | null {
-  if (!existsSync(CACHE_PATH)) return null;
+  const cachePath = getMetadataCachePath();
+  if (!existsSync(cachePath)) return null;
   try {
-    const raw = JSON.parse(readFileSync(CACHE_PATH, "utf-8"));
+    const raw = JSON.parse(readFileSync(cachePath, "utf-8"));
     if (!raw || typeof raw !== "object") return null;
     if (raw.version !== CACHE_VERSION) return null;
     if (!raw.servers || typeof raw.servers !== "object") return null;
@@ -57,13 +61,14 @@ export function loadMetadataCache(): MetadataCache | null {
 }
 
 export function saveMetadataCache(cache: MetadataCache): void {
-  const dir = dirname(CACHE_PATH);
+  const cachePath = getMetadataCachePath();
+  const dir = dirname(cachePath);
   mkdirSync(dir, { recursive: true });
 
   let merged: MetadataCache = { version: CACHE_VERSION, servers: {} };
   try {
-    if (existsSync(CACHE_PATH)) {
-      const existing = JSON.parse(readFileSync(CACHE_PATH, "utf-8")) as MetadataCache;
+    if (existsSync(cachePath)) {
+      const existing = JSON.parse(readFileSync(cachePath, "utf-8")) as MetadataCache;
       if (existing && existing.version === CACHE_VERSION && existing.servers) {
         merged.servers = { ...existing.servers };
       }
@@ -75,9 +80,9 @@ export function saveMetadataCache(cache: MetadataCache): void {
   merged.version = CACHE_VERSION;
   merged.servers = { ...merged.servers, ...cache.servers };
 
-  const tmpPath = `${CACHE_PATH}.${process.pid}.tmp`;
+  const tmpPath = `${cachePath}.${process.pid}.tmp`;
   writeFileSync(tmpPath, JSON.stringify(merged, null, 2), "utf-8");
-  renameSync(tmpPath, CACHE_PATH);
+  renameSync(tmpPath, cachePath);
 }
 
 export function computeServerHash(definition: ServerEntry): string {
